@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>OmniNotes Sync - Z Fold & Googlebook Notes</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            handwriting: ['Caveat', 'cursive'],
+          },
+          colors: {
+            samsung: {
+              blue: '#0c66e4',
+              hover: '#0055cc',
+              light: '#e9f2ff',
+              dark: '#172b4d',
+              surface: '#f4f5f7',
+              accent: '#ff5c5c',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.7); }
+
+    /* Canvas background grids */
+    .bg-paper-blank { background-color: #ffffff; }
+    .bg-paper-ruled {
+      background-color: #ffffff;
+      background-image: linear-gradient(rgba(203, 213, 225, 0.6) 1px, transparent 1px);
+      background-size: 100% 28px;
+    }
+    .bg-paper-grid {
+      background-color: #ffffff;
+      background-image: radial-gradient(rgba(148, 163, 184, 0.5) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .bg-paper-dark {
+      background-color: #1e293b;
+      background-image: linear-gradient(rgba(51, 65, 85, 0.6) 1px, transparent 1px);
+      background-size: 100% 28px;
+    }
+
+    /* Touch & Stylus Optimization */
+    canvas { touch-action: none; }
+    .no-select { user-select: none; -webkit-user-select: none; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased h-screen w-screen flex flex-col overflow-hidden font-sans select-none">
+
+  <!-- TOP APP BAR -->
+  <header class="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-20 flex-shrink-0">
+    <!-- Left: Branding & Folder drawer toggle -->
+    <div class="flex items-center space-x-3">
+      <button id="toggle-sidebar-btn" class="p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition" title="Toggle Navigation">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+      </button>
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+        </div>
+        <div>
+          <h1 class="font-bold text-slate-900 leading-none text-base">FoldSync Notes</h1>
+          <span class="text-[10px] text-blue-600 font-semibold tracking-wider uppercase">Z Fold &bull; Googlebook</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Device Mode Simulator Toggle (For testing responsiveness & fold postures) -->
+    <div class="hidden md:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs">
+      <button id="mode-auto" class="px-2.5 py-1 rounded-lg font-medium bg-white text-slate-800 shadow-sm transition">Auto View</button>
+      <button id="mode-fold-cover" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+        <span>Cover (Mobile)</span>
+      </button>
+      <button id="mode-fold-open" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+        <span>Fold (8.0" Tablet)</span>
+      </button>
+      <button id="mode-chromebook" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+        <span>Googlebook</span>
+      </button>
+      <button id="mode-flex" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+        <span>Flex Mode</span>
+      </button>
+    </div>
+
+    <!-- Right: Sync status pill & quick action buttons -->
+    <div class="flex items-center space-x-2">
+      <!-- Sync Status Button -->
+      <button id="sync-modal-btn" class="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition text-xs font-medium">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+        </span>
+        <span id="sync-status-text" class="hidden sm:inline">Synced (Z Fold &harr; Googlebook)</span>
+        <span class="sm:hidden">Synced</span>
+      </button>
+
+      <!-- New Note Button -->
+      <button id="new-note-btn" class="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm text-xs font-semibold transition active:scale-95">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span>New Note</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER (Supports simulating device frames or taking full screen) -->
+  <div id="device-wrapper" class="flex-1 flex overflow-hidden w-full transition-all duration-300 mx-auto justify-center">
+
+    <!-- APP INNER CONTAINER -->
+    <div id="app-viewport" class="flex-1 flex w-full h-full bg-white relative overflow-hidden transition-all duration-300">
+
+      <!-- LEFT SIDEBAR: FOLDERS, TAGS & SYSTEM NAV -->
+      <aside id="sidebar" class="w-64 bg-slate-50 border-r border-slate-200 flex flex-col flex-shrink-0 transition-all duration-200 z-10">
+        <!-- Search bar -->
+        <div class="p-3 border-b border-slate-200">
+          <div class="relative">
+            <svg class="w-4 h-4 absolute left-3 top-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" id="search-input" placeholder="Search notes, tags, ink..." class="w-full bg-white border border-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition">
+          </div>
+        </div>
+
+        <!-- Navigation Categories -->
+        <div class="p-3 space-y-1">
+          <button data-filter="all" class="nav-filter-btn active w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium bg-blue-100/70 text-blue-700 transition">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              All Notes
+            </span>
+            <span id="badge-all-count" class="bg-blue-200 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>
+          </button>
+
+          <button data-filter="starred" class="nav-filter-btn w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200/60 transition">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+              Favorites
+            </span>
+            <span id="badge-starred-count" class="text-slate-400 text-[10px] px-1.5 py-0.5">1</span>
+          </button>
+
+          <button data-filter="pdf" class="nav-filter-btn w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200/60 transition">
+            <span class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              PDF Annotations
+            </span>
+            <span id="badge-pdf-count" class="text-slate-400 text-[10px] px-1.5 py-0.5">1</span>
+          </button>
+        </div>
+
+        <!-- Folders Header & List -->
+        <div class="px-3 pt-2 pb-1 flex items-center justify-between">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Folders</span>
+          <button id="add-folder-btn" class="p-1 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition" title="Add Folder">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          </button>
+        </div>
+
+        <div id="folders-list" class="flex-1 overflow-y-auto px-3 space-y-1">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Sync Diagnostics footer -->
+        <div class="p-3 border-t border-slate-200 bg-slate-100/60 text-[11px] text-slate-500 flex items-center justify-between">
+          <div class="flex items-center gap-1.5 truncate">
+            <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+            <span class="truncate">Local-First CRDT Active</span>
+          </div>
+          <button id="backup-btn" class="text-blue-600 hover:underline font-semibold" title="Import/Export Backup">Backup</button>
+        </div>
+      </aside>
+
+      <!-- MIDDLE COLUMN: NOTES LIST / GALLERY (Adaptive width) -->
+      <section id="notes-list-pane" class="w-80 border-r border-slate-200 bg-white flex flex-col flex-shrink-0">
+        <!-- View Title & Sorters -->
+        <div class="p-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+          <div>
+            <h2 id="current-category-title" class="font-bold text-slate-800 text-sm">All Notes</h2>
+            <p id="notes-count-summary" class="text-[11px] text-slate-400">3 notes &bull; synced</p>
+          </div>
+          <div class="flex items-center space-x-1">
+            <button id="sort-order-btn" class="p-1.5 rounded-lg hover:bg-slate-200/60 text-slate-500 transition" title="Sort Notes">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/></svg>
+            </button>
+            <button id="view-mode-toggle" class="p-1.5 rounded-lg hover:bg-slate-200/60 text-slate-500 transition" title="Toggle Grid/List">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Notes Cards Container -->
+        <div id="notes-container" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: NOTE EDITOR & S-PEN CANVAS WORKSPACE -->
+      <main id="editor-pane" class="flex-1 flex flex-col bg-slate-50 relative overflow-hidden">
+
+        <!-- EDITOR TOP TOOLBAR (Samsung Notes Style) -->
+        <div id="editor-header" class="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between flex-shrink-0 z-10">
+          <!-- Back button (for mobile/cover screen view) & Title input -->
+          <div class="flex items-center space-x-3 flex-1 min-w-0 mr-4">
+            <button id="mobile-back-btn" class="md:hidden p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <div class="flex-1 min-w-0">
+              <input type="text" id="note-title-input" placeholder="Title your note..." class="w-full text-base font-bold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-0 p-0 placeholder-slate-400">
+              <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
+                <span id="note-date-text">Just now</span>
+                <span>&bull;</span>
+                <span id="note-folder-badge" class="px-1.5 py-0.2 bg-slate-100 rounded text-slate-600 font-medium">Work & Projects</span>
+                <span id="note-save-status" class="text-emerald-600 flex items-center gap-1">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  Saved
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mode Selectors: S-Pen Canvas vs Rich Text vs Hybrid -->
+          <div class="flex items-center space-x-2">
+            <!-- Mode Switcher -->
+            <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+              <button id="mode-pen-btn" class="px-3 py-1 rounded-lg font-medium bg-white text-blue-600 shadow-sm transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                <span>S-Pen Ink</span>
+              </button>
+              <button id="mode-text-btn" class="px-3 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+                <span>Rich Text</span>
+              </button>
+              <button id="mode-hybrid-btn" class="px-3 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/></svg>
+                <span>Split / PDF</span>
+              </button>
+            </div>
+
+            <!-- Actions: Star, Voice Memo, Templates, Options -->
+            <button id="star-note-btn" class="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-amber-500 transition" title="Favorite Note">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+            </button>
+
+            <!-- Voice Recording Toggle -->
+            <button id="voice-record-btn" class="p-2 rounded-xl hover:bg-slate-100 text-slate-600 hover:text-rose-600 transition flex items-center gap-1.5" title="Audio Memo (Samsung Voice Bookmark)">
+              <svg class="w-5 h-5 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"/></svg>
+            </button>
+
+            <!-- Page Template Chooser -->
+            <button id="template-btn" class="p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition" title="Paper Style">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+            </button>
+
+            <!-- Delete Note -->
+            <button id="delete-note-btn" class="p-2 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Delete Note">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- AUDIO RECORDING BANNER (Samsung Voice Note Bar) -->
+        <div id="audio-bar" class="hidden bg-rose-50 border-b border-rose-200 px-4 py-2 flex items-center justify-between z-10 transition">
+          <div class="flex items-center space-x-3">
+            <span class="flex h-3 w-3 relative">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-600"></span>
+            </span>
+            <span id="recording-time" class="font-mono text-xs font-bold text-rose-700">00:14</span>
+            <span class="text-xs text-rose-600 font-medium">Recording audio memo &bull; S-Pen strokes synchronized</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="add-bookmark-btn" class="px-2.5 py-1 bg-white hover:bg-rose-100 border border-rose-300 text-rose-700 rounded-lg text-xs font-semibold shadow-sm transition">
+              + Mark Bookmark
+            </button>
+            <button id="stop-recording-btn" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+              Stop & Save
+            </button>
+          </div>
+        </div>
+
+        <!-- S-PEN INKING FLOATING / DOCKED PALETTE (SAMSUNG ONE UI STYLE) -->
+        <div id="pen-toolbar" class="bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shadow-sm z-10">
+          <!-- Tools: Pen, Highlighter, Pencil, Eraser, Smart Shapes, Lasso -->
+          <div class="flex items-center space-x-1">
+            <!-- Pen -->
+            <button data-tool="pen" class="tool-btn active p-2 rounded-xl bg-blue-100 text-blue-700 font-medium text-xs flex items-center gap-1.5 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              <span>Pen</span>
+            </button>
+
+            <!-- Fountain / Calligraphy Pen -->
+            <button data-tool="fountain" class="tool-btn p-2 rounded-xl hover:bg-slate-100 text-slate-600 font-medium text-xs flex items-center gap-1.5 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+              <span>Calligraphy</span>
+            </button>
+
+            <!-- Highlighter -->
+            <button data-tool="highlighter" class="tool-btn p-2 rounded-xl hover:bg-slate-100 text-slate-600 font-medium text-xs flex items-center gap-1.5 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              <span>Highlighter</span>
+            </button>
+
+            <!-- Eraser (Stroke-based) -->
+            <button data-tool="eraser" class="tool-btn p-2 rounded-xl hover:bg-slate-100 text-slate-600 font-medium text-xs flex items-center gap-1.5 transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <span>Eraser</span>
+            </button>
+
+            <!-- Smart Shape Snapping Toggle -->
+            <button id="smart-shape-btn" class="p-2 rounded-xl hover:bg-slate-100 text-slate-600 font-medium text-xs flex items-center gap-1.5 transition" title="Auto-convert hand-drawn shapes to neat geometric circles, boxes, and lines">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+              <span>Neat Shapes</span>
+            </button>
+          </div>
+
+          <!-- Color Swatches & Stroke Width -->
+          <div class="flex items-center space-x-3">
+            <!-- Samsung Signature Color Palette -->
+            <div class="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl">
+              <button data-color="#1e293b" class="color-swatch active w-5 h-5 rounded-full bg-slate-800 ring-2 ring-offset-1 ring-blue-600 transition" title="Black"></button>
+              <button data-color="#0c66e4" class="color-swatch w-5 h-5 rounded-full bg-blue-600 transition" title="Samsung Blue"></button>
+              <button data-color="#e11d48" class="color-swatch w-5 h-5 rounded-full bg-rose-600 transition" title="Red"></button>
+              <button data-color="#059669" class="color-swatch w-5 h-5 rounded-full bg-emerald-600 transition" title="Emerald"></button>
+              <button data-color="#d97706" class="color-swatch w-5 h-5 rounded-full bg-amber-500 transition" title="Amber"></button>
+              <button data-color="#8b5cf6" class="color-swatch w-5 h-5 rounded-full bg-purple-500 transition" title="Purple"></button>
+              <input type="color" id="custom-color-picker" value="#1e293b" class="w-5 h-5 rounded-full cursor-pointer opacity-0 absolute">
+              <button id="custom-color-trigger" class="w-5 h-5 rounded-full bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400 flex items-center justify-center text-[10px] text-white font-bold" title="Custom Color">+</button>
+            </div>
+
+            <!-- Stroke Size Range -->
+            <div class="flex items-center space-x-2">
+              <span class="text-[10px] text-slate-400 font-semibold uppercase">Size</span>
+              <input type="range" id="brush-size" min="1" max="30" value="3" class="w-20 accent-blue-600 cursor-pointer">
+              <span id="brush-size-display" class="text-xs font-mono font-semibold text-slate-700 w-4">3</span>
+            </div>
+
+            <div class="h-4 w-px bg-slate-200"></div>
+
+            <!-- Undo / Redo & Clear -->
+            <div class="flex items-center space-x-1">
+              <button id="undo-btn" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition" title="Undo (Ctrl+Z)">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v2M3 10l6 6m-6-6l6-6"/></svg>
+              </button>
+              <button id="redo-btn" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition" title="Redo (Ctrl+Y)">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a5 5 0 00-5 5v2m15-7l-6 6m6-6l-6-6"/></svg>
+              </button>
+              <button id="clear-canvas-btn" class="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition" title="Clear Canvas">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CANVAS & WORKSPACE BODY -->
+        <div id="canvas-scroll-container" class="flex-1 relative overflow-auto p-4 flex justify-center bg-slate-100">
+
+          <!-- NOTE PAPER CONTAINER -->
+          <div id="note-paper" class="w-full max-w-4xl bg-white shadow-md rounded-2xl relative min-h-[850px] transition-all duration-200 flex flex-col overflow-hidden bg-paper-ruled">
+
+            <!-- PDF Annotation Sample Overlay (When PDF mode is active) -->
+            <div id="pdf-background" class="hidden absolute inset-0 pointer-events-none p-8 z-0">
+              <div class="border-2 border-dashed border-rose-300 rounded-xl p-6 bg-rose-50/40">
+                <div class="flex items-center justify-between pb-4 border-b border-rose-200">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded uppercase">PDF Doc</span>
+                    <span class="font-bold text-slate-800 text-sm">System_Architecture_v2.6.pdf &bull; Page 1/3</span>
+                  </div>
+                  <span class="text-xs text-rose-700 font-medium">Samsung Notes PDF Markup Active</span>
+                </div>
+                <div class="mt-4 space-y-3 text-xs text-slate-700 leading-relaxed">
+                  <p class="font-semibold text-slate-900 text-sm">Cross-Device Synchronization Framework</p>
+                  <p>1. Local-First CRDT Data Persistence Model ensures instantaneous writes on mobile S-Pen events with zero cloud latency.</p>
+                  <p>2. Sub-frame predictive touch smoothing matches Samsung Notes hardware latency profile (&lt;10ms perceived delay).</p>
+                  <p>3. Bi-directional WebSocket syncing connects the Galaxy Z Fold 8 client directly to the Chromebook PWA.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- RICH TEXT EDITOR LAYER (When in text or split mode) -->
+            <div id="text-layer" class="hidden p-8 z-10 flex-1 flex flex-col">
+              <div id="rich-text-content" contenteditable="true" class="flex-1 focus:outline-none text-slate-800 text-sm leading-relaxed min-h-[400px]" placeholder="Start typing notes, paste links, or create checklists...">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <!-- INK DRAWING CANVAS LAYER -->
+            <canvas id="ink-canvas" class="absolute inset-0 w-full h-full cursor-crosshair z-10"></canvas>
+
+            <!-- AUDIO BOOKMARKS MARKER LAYER (Visual markers along margin) -->
+            <div id="audio-markers-container" class="absolute left-2 top-0 bottom-0 w-6 pointer-events-none z-20">
+              <!-- Bookmarks appear here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- FLEX MODE BOTTOM CONTROLS (Only visible in Flex Mode simulation) -->
+        <div id="flex-mode-panel" class="hidden h-52 bg-slate-900 text-white p-4 border-t border-slate-700 flex flex-col justify-between z-20">
+          <div class="flex items-center justify-between">
+            <span class="text-xs uppercase font-bold tracking-wider text-blue-400">Galaxy Z Fold Flex Mode Posture</span>
+            <span class="text-[11px] text-slate-400">Hinge Angle: 95&deg; (Tabletop Mode)</span>
+          </div>
+          <div class="grid grid-cols-4 gap-3 my-2">
+            <button id="flex-voice-btn" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold gap-1 transition">
+              <span class="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></span>
+              <span>Voice Sync</span>
+            </button>
+            <button id="flex-neat-btn" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold gap-1 transition">
+              <span class="text-purple-400">&square;</span>
+              <span>Shape Snap</span>
+            </button>
+            <button id="flex-ocr-btn" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold gap-1 transition">
+              <span class="text-emerald-400">&Tfr;</span>
+              <span>Handwriting OCR</span>
+            </button>
+            <button id="flex-export-btn" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold gap-1 transition">
+              <span class="text-blue-400">&darr;</span>
+              <span>Export PDF</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400 text-center">Top half displays unobstructed canvas &bull; Bottom half hosts ergonomic thumb controls</p>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL: CLOUD SYNC & DEVICE PEERS -->
+  <div id="sync-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Cross-Device Cloud Sync</h3>
+            <p class="text-xs text-slate-400">CRDT Peer Network &bull; End-to-End Encrypted</p>
+          </div>
+        </div>
+        <button id="close-sync-modal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="py-4 space-y-3">
+        <!-- Connected Devices List -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Connected Devices</span>
+          
+          <div class="flex items-center justify-between text-xs py-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span class="font-semibold text-slate-800">Samsung Galaxy Z Fold 8</span>
+              <span class="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-medium">S-Pen Client</span>
+            </div>
+            <span class="text-slate-400 text-[11px]">Online</span>
+          </div>
+
+          <div class="flex items-center justify-between text-xs py-1">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span class="font-semibold text-slate-800">Googlebook (ChromeOS)</span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-medium">This Device</span>
+            </div>
+            <span class="text-slate-400 text-[11px]">Active</span>
+          </div>
+        </div>
+
+        <!-- Sync Actions -->
+        <div class="space-y-2">
+          <button id="trigger-sync-btn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center justify-center gap-2">
+            <svg class="w-4 h-4 animate-spin hidden" id="sync-spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+            <span>Sync All Changes Now</span>
+          </button>
+          
+          <button id="simulate-remote-edit-btn" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5">
+            <span>Simulate Stroke Inbound from Z Fold 8</span>
+          </button>
+        </div>
+
+        <!-- Diagnostics -->
+        <div class="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1 font-mono">
+          <div class="flex justify-between"><span>Local Storage Used:</span><span id="storage-used-display">42.8 KB</span></div>
+          <div class="flex justify-between"><span>CRDT Document Clock:</span><span id="clock-display">v128_state</span></div>
+          <div class="flex justify-between"><span>Conflict Resolution:</span><span>Last-Write-Wins (LWW-CRDT)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD FOLDER -->
+  <div id="folder-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200">
+      <h3 class="font-bold text-slate-800 text-sm mb-3">Create New Folder</h3>
+      <input type="text" id="new-folder-name" placeholder="Folder name (e.g. YouTube Scripts)..." class="w-full text-xs p-2.5 border border-slate-200 rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+      <div class="mb-4">
+        <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Color Accent</label>
+        <div class="flex items-center space-x-2" id="folder-color-choices">
+          <button data-color="#0c66e4" class="w-6 h-6 rounded-full bg-blue-600 ring-2 ring-offset-1 ring-blue-600"></button>
+          <button data-color="#059669" class="w-6 h-6 rounded-full bg-emerald-600"></button>
+          <button data-color="#d97706" class="w-6 h-6 rounded-full bg-amber-500"></button>
+          <button data-color="#8b5cf6" class="w-6 h-6 rounded-full bg-purple-500"></button>
+          <button data-color="#e11d48" class="w-6 h-6 rounded-full bg-rose-600"></button>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2">
+        <button id="cancel-folder-btn" class="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button id="save-folder-btn" class="px-3.5 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TEMPLATE PICKER -->
+  <div id="template-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200">
+      <h3 class="font-bold text-slate-800 text-sm mb-3">Choose Note Paper Style</h3>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <button data-template="bg-paper-ruled" class="template-choice-btn p-3 rounded-xl border-2 border-blue-600 bg-paper-ruled text-left h-24 flex flex-col justify-end">
+          <span class="text-xs font-bold text-slate-800 bg-white/90 px-1 rounded">College Ruled</span>
+        </button>
+        <button data-template="bg-paper-grid" class="template-choice-btn p-3 rounded-xl border border-slate-200 bg-paper-grid text-left h-24 flex flex-col justify-end">
+          <span class="text-xs font-bold text-slate-800 bg-white/90 px-1 rounded">Math Grid</span>
+        </button>
+        <button data-template="bg-paper-blank" class="template-choice-btn p-3 rounded-xl border border-slate-200 bg-paper-blank text-left h-24 flex flex-col justify-end">
+          <span class="text-xs font-bold text-slate-800 bg-white/90 px-1 rounded">Blank Sheet</span>
+        </button>
+        <button data-template="bg-paper-dark" class="template-choice-btn p-3 rounded-xl border border-slate-200 bg-paper-dark text-left h-24 flex flex-col justify-end">
+          <span class="text-xs font-bold text-white bg-slate-900/90 px-1 rounded">Night Mode</span>
+        </button>
+      </div>
+      <div class="flex justify-end">
+        <button id="close-template-modal" class="px-3.5 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: BACKUP IMPORT / EXPORT -->
+  <div id="backup-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="font-bold text-slate-800 text-base">Backup & Data Portability</h3>
+        <button id="close-backup-modal" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="py-4 space-y-4 text-xs text-slate-600">
+        <p>Transfer your note database directly between your Samsung Galaxy Z Fold and your Chromebook using an encrypted JSON bundle.</p>
+        <div class="flex gap-2">
+          <button id="export-json-btn" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition">Export Notes JSON</button>
+          <button id="import-trigger-btn" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl transition">Import JSON</button>
+          <input type="file" id="import-file-input" accept=".json" class="hidden">
+        </div>
+        <div class="border-t border-slate-100 pt-3">
+          <span class="font-semibold block mb-1 text-slate-700">Restore Default Samsung Notes Demo:</span>
+          <button id="restore-demo-btn" class="text-xs text-rose-600 hover:underline font-medium">Reset sample notes & sketches</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl z-50 flex items-center space-x-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <span id="toast-icon" class="text-blue-400">&check;</span>
+    <span id="toast-message">Note saved locally</span>
+  </div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    /* =========================================================================
+       INITIAL STATE & LOCAL STORAGE INITIALIZATION
+       ========================================================================= */
+    const STORAGE_KEY = 'omninotes_app_state_v1';
+
+    const defaultNotes = [
+      {
+        id: 'note-1',
+        title: 'Galaxy Z Fold 8 & Chromebook Sync Plan',
+        folderId: 'folder-work',
+        starred: true,
+        isPdf: false,
+        paperStyle: 'bg-paper-ruled',
+        updatedAt: Date.now() - 3600000,
+        text: `<div><strong>1. S-Pen Hardware Integration</strong></div><div>- Enable stylus pressure curves with low-latency Canvas stroke rendering.</div><div>- Auto-detect palm rejection using PointerEvents (pointerType === 'pen').</div><br><div><strong>2. Cross-Device CRDT Sync</strong></div><div>- Local SQLite/IndexedDB store on Foldable and Chromebook.</div><div>- Delta updates dispatched via WebSockets on stroke completion.</div><br><div><strong>3. Foldable Dual Pane Layout</strong></div><div>- Single column on Cover screen; split canvas on unfolded 8.0" display.</div>`,
+        strokes: [
+          // Pre-drawn demo arrow & diagram
+          {
+            tool: 'pen',
+            color: '#0c66e4',
+            size: 3,
+            points: [
+              { x: 120, y: 340, p: 0.6 },
+              { x: 150, y: 345, p: 0.7 },
+              { x: 220, y: 340, p: 0.8 },
+              { x: 290, y: 320, p: 0.7 },
+              { x: 350, y: 290, p: 0.6 }
+            ]
+          },
+          {
+            tool: 'pen',
+            color: '#0c66e4',
+            size: 3,
+            points: [
+              { x: 330, y: 275, p: 0.7 },
+              { x: 350, y: 290, p: 0.8 },
+              { x: 325, y: 305, p: 0.7 }
+            ]
+          },
+          {
+            tool: 'highlighter',
+            color: '#facc15',
+            size: 16,
+            points: [
+              { x: 80, y: 70, p: 0.5 },
+              { x: 420, y: 70, p: 0.5 }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'note-2',
+        title: 'Tech Review Script: Samsung Notes vs 3rd Party',
+        folderId: 'folder-scripts',
+        starred: false,
+        isPdf: false,
+        paperStyle: 'bg-paper-grid',
+        updatedAt: Date.now() - 7200000,
+        text: `<div><strong>Hook:</strong> Samsung Notes vs Third Party Apps in 2026.</div><div>- Samsung Notes folder structure with custom color coding and covers.</div><div>- Instant S-Pen handwriting-to-text OCR.</div><div>- The limitation: Locked down to Samsung ecosystem.</div><div>- Solution: Build our own custom synchronized notes engine!</div>`,
+        strokes: []
+      },
+      {
+        id: 'note-3',
+        title: 'Annotated Architecture PDF Spec',
+        folderId: 'folder-work',
+        starred: true,
+        isPdf: true,
+        paperStyle: 'bg-paper-ruled',
+        updatedAt: Date.now() - 86400000,
+        text: `<div>Annotation notes for System Architecture v2.6.</div><div>Verified sub-10ms latency target for S-Pen input on Z Fold 8.</div>`,
+        strokes: [
+          {
+            tool: 'highlighter',
+            color: '#38bdf8',
+            size: 18,
+            points: [
+              { x: 110, y: 155, p: 0.5 },
+              { x: 450, y: 155, p: 0.5 }
+            ]
+          },
+          {
+            tool: 'pen',
+            color: '#e11d48',
+            size: 3,
+            points: [
+              { x: 460, y: 145, p: 0.7 },
+              { x: 500, y: 130, p: 0.7 },
+              { x: 550, y: 135, p: 0.7 }
+            ]
+          }
+        ]
+      }
+    ];
+
+    const defaultFolders = [
+      { id: 'folder-work', name: 'Work & Projects', color: '#0c66e4' },
+      { id: 'folder-scripts', name: 'YouTube Scripts', color: '#8b5cf6' },
+      { id: 'folder-personal', name: 'Personal & Ideas', color: '#059669' }
+    ];
+
+    // Load state safely
+    let appState = {
+      notes: defaultNotes,
+      folders: defaultFolders,
+      activeNoteId: 'note-1',
+      activeFilter: 'all',
+      searchQuery: '',
+      currentTool: 'pen', // 'pen', 'fountain', 'highlighter', 'eraser'
+      currentColor: '#1e293b',
+      currentSize: 3,
+      smartShapeActive: false,
+      editorMode: 'pen', // 'pen', 'text', 'hybrid'
+      paperStyle: 'bg-paper-ruled',
+      isRecording: false,
+      recordingSeconds: 0
+    };
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.notes && parsed.notes.length > 0) {
+          appState.notes = parsed.notes;
+          appState.folders = parsed.folders || defaultFolders;
+          appState.activeNoteId = parsed.notes[0].id;
+        }
+      }
+    } catch (e) {
+      console.warn('LocalStorage unavailable, running in-memory', e);
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          notes: appState.notes,
+          folders: appState.folders
+        }));
+        updateDiagnostics();
+      } catch (e) {
+        console.warn('Failed to save to localStorage', e);
+      }
+    }
+
+    /* =========================================================================
+       DOM ELEMENTS
+       ========================================================================= */
+    const deviceWrapper = document.getElementById('device-wrapper');
+    const appViewport = document.getElementById('app-viewport');
+    const sidebar = document.getElementById('sidebar');
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+    const notesContainer = document.getElementById('notes-container');
+    const foldersList = document.getElementById('folders-list');
+    const noteTitleInput = document.getElementById('note-title-input');
+    const noteFolderBadge = document.getElementById('note-folder-badge');
+    const noteDateText = document.getElementById('note-date-text');
+    const richTextContent = document.getElementById('rich-text-content');
+    const inkCanvas = document.getElementById('ink-canvas');
+    const ctx = inkCanvas.getContext('2d');
+    const notePaper = document.getElementById('note-paper');
+    const pdfBackground = document.getElementById('pdf-background');
+    const textLayer = document.getElementById('text-layer');
+    const penToolbar = document.getElementById('pen-toolbar');
+    const toast = document.getElementById('toast');
+    const toastMessage = document.getElementById('toast-message');
+
+    // Drawing State
+    let isDrawing = false;
+    let currentStroke = null;
+    let undoStack = [];
+    let redoStack = [];
+
+    /* =========================================================================
+       CANVAS RESIZING & HIGH DPI HANDLING
+       ========================================================================= */
+    function resizeCanvas() {
+      const rect = notePaper.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      
+      inkCanvas.width = rect.width * dpr;
+      inkCanvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      redrawCanvas();
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+    });
+
+    /* =========================================================================
+       CANVAS RENDERING & INK PIPELINE
+       ========================================================================= */
+    function redrawCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      ctx.clearRect(0, 0, inkCanvas.width / dpr, inkCanvas.height / dpr);
+
+      const activeNote = getActiveNote();
+      if (!activeNote || !activeNote.strokes) return;
+
+      activeNote.strokes.forEach(stroke => {
+        drawStroke(stroke);
+      });
+    }
+
+    function drawStroke(stroke) {
+      if (!stroke.points || stroke.points.length < 1) return;
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (stroke.tool === 'highlighter') {
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.size || 16;
+      } else if (stroke.tool === 'fountain') {
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = stroke.color;
+      } else {
+        ctx.globalAlpha = 1.0;
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.size || 3;
+      }
+
+      if (stroke.isShape) {
+        // Render smart geometric shape
+        renderNeatShape(stroke);
+      } else if (stroke.points.length === 1) {
+        ctx.fillStyle = stroke.color;
+        ctx.beginPath();
+        ctx.arc(stroke.points[0].x, stroke.points[0].y, (stroke.size || 3) / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Render smooth quadratic curves between points
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+        for (let i = 1; i < stroke.points.length - 1; i++) {
+          const xc = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+          const yc = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+          
+          if (stroke.tool === 'fountain') {
+            // Pressure variation
+            const pressure = stroke.points[i].p || 0.5;
+            ctx.lineWidth = Math.max(1, stroke.size * pressure * 1.5);
+          }
+          
+          ctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, xc, yc);
+        }
+
+        const last = stroke.points[stroke.points.length - 1];
+        ctx.lineTo(last.x, last.y);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function renderNeatShape(stroke) {
+      ctx.beginPath();
+      ctx.lineWidth = stroke.size;
+      ctx.strokeStyle = stroke.color;
+
+      if (stroke.shapeType === 'circle') {
+        ctx.arc(stroke.cx, stroke.cy, stroke.radius, 0, Math.PI * 2);
+      } else if (stroke.shapeType === 'rect') {
+        ctx.strokeRect(stroke.x, stroke.y, stroke.w, stroke.h);
+        return;
+      } else if (stroke.shapeType === 'line') {
+        ctx.moveTo(stroke.x1, stroke.y1);
+        ctx.lineTo(stroke.x2, stroke.y2);
+      }
+      ctx.stroke();
+    }
+
+    /* =========================================================================
+       S-PEN & POINTER EVENTS (PRESSURE & LOW LATENCY)
+       ========================================================================= */
+    function getCanvasCoordinates(e) {
+      const rect = inkCanvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+        p: e.pressure && e.pressure > 0 ? e.pressure : 0.6 // S-Pen pressure
+      };
+    }
+
+    inkCanvas.addEventListener('pointerdown', (e) => {
+      // Don't draw if in pure text mode
+      if (appState.editorMode === 'text') return;
+
+      inkCanvas.setPointerCapture(e.pointerId);
+      isDrawing = true;
+      const pt = getCanvasCoordinates(e);
+
+      if (appState.currentTool === 'eraser') {
+        eraseStrokeAt(pt.x, pt.y);
+        return;
+      }
+
+      currentStroke = {
+        tool: appState.currentTool,
+        color: appState.currentColor,
+        size: appState.currentSize,
+        points: [pt]
+      };
+    });
+
+    inkCanvas.addEventListener('pointermove', (e) => {
+      if (!isDrawing) return;
+      const pt = getCanvasCoordinates(e);
+
+      if (appState.currentTool === 'eraser') {
+        eraseStrokeAt(pt.x, pt.y);
+        return;
+      }
+
+      if (currentStroke) {
+        currentStroke.points.push(pt);
+        redrawCanvas();
+        drawStroke(currentStroke);
+      }
+    });
+
+    inkCanvas.addEventListener('pointerup', (e) => {
+      if (!isDrawing) return;
+      isDrawing = false;
+
+      if (currentStroke && currentStroke.points.length > 0) {
+        // Check for Smart Shape Snapping
+        if (appState.smartShapeActive && currentStroke.points.length > 10) {
+          const snapped = attemptShapeSnap(currentStroke);
+          if (snapped) {
+            currentStroke = snapped;
+            showToast('Snapped to neat geometric shape');
+          }
+        }
+
+        const activeNote = getActiveNote();
+        if (activeNote) {
+          activeNote.strokes.push(currentStroke);
+          activeNote.updatedAt = Date.now();
+          undoStack.push({ type: 'add_stroke', stroke: currentStroke });
+          redoStack = [];
+          saveState();
+          redrawCanvas();
+          renderNotesList();
+        }
+      }
+      currentStroke = null;
+    });
+
+    inkCanvas.addEventListener('pointercancel', () => {
+      isDrawing = false;
+      currentStroke = null;
+    });
+
+    /* =========================================================================
+       SMART SHAPE SNAPPING ALGORITHM (SAMSUNG NEAT SHAPES)
+       ========================================================================= */
+    function attemptShapeSnap(stroke) {
+      const pts = stroke.points;
+      const pFirst = pts[0];
+      const pLast = pts[pts.length - 1];
+      const distStartEnd = Math.hypot(pLast.x - pFirst.x, pLast.y - pFirst.y);
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      pts.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      });
+      const width = maxX - minX;
+      const height = maxY - minY;
+
+      // 1. Straight line check
+      if (distStartEnd > 50 && distStartEnd > Math.hypot(width, height) * 0.9) {
+        return {
+          tool: stroke.tool,
+          color: stroke.color,
+          size: stroke.size,
+          isShape: true,
+          shapeType: 'line',
+          x1: pFirst.x,
+          y1: pFirst.y,
+          x2: pLast.x,
+          y2: pLast.y,
+          points: pts
+        };
+      }
+
+      // 2. Closed loop check (Circle / Rectangle)
+      if (distStartEnd < 45 && width > 30 && height > 30) {
+        const aspect = width / height;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const radius = (width + height) / 4;
+
+        if (aspect >= 0.75 && aspect <= 1.35) {
+          // Snap to circle
+          return {
+            tool: stroke.tool,
+            color: stroke.color,
+            size: stroke.size,
+            isShape: true,
+            shapeType: 'circle',
+            cx: centerX,
+            cy: centerY,
+            radius: radius,
+            points: pts
+          };
+        } else {
+          // Snap to box
+          return {
+            tool: stroke.tool,
+            color: stroke.color,
+            size: stroke.size,
+            isShape: true,
+            shapeType: 'rect',
+            x: minX,
+            y: minY,
+            w: width,
+            h: height,
+            points: pts
+          };
+        }
+      }
+
+      return null;
+    }
+
+    /* =========================================================================
+       STROKE ERASER (VECTOR STROKE DETECTION)
+       ========================================================================= */
+    function eraseStrokeAt(x, y) {
+      const activeNote = getActiveNote();
+      if (!activeNote || !activeNote.strokes) return;
+
+      const threshold = 16;
+      let erased = false;
+
+      for (let i = activeNote.strokes.length - 1; i >= 0; i--) {
+        const stroke = activeNote.strokes[i];
+        for (let j = 0; j < stroke.points.length; j++) {
+          const pt = stroke.points[j];
+          if (Math.hypot(pt.x - x, pt.y - y) < threshold) {
+            const removed = activeNote.strokes.splice(i, 1)[0];
+            undoStack.push({ type: 'erase_stroke', stroke: removed, index: i });
+            redoStack = [];
+            erased = true;
+            break;
+          }
+        }
+        if (erased) break;
+      }
+
+      if (erased) {
+        saveState();
+        redrawCanvas();
+        renderNotesList();
+      }
+    }
+
+    /* =========================================================================
+       NOTE MODEL & NOTE SWITCHING
+       ========================================================================= */
+    function getActiveNote() {
+      return appState.notes.find(n => n.id === appState.activeNoteId) || appState.notes[0];
+    }
+
+    function switchNote(noteId) {
+      appState.activeNoteId = noteId;
+      undoStack = [];
+      redoStack = [];
+      loadActiveNoteToEditor();
+      renderNotesList();
+
+      // On mobile view, collapse middle list to show editor
+      if (window.innerWidth < 768) {
+        document.getElementById('notes-list-pane').classList.add('hidden');
+        document.getElementById('editor-pane').classList.remove('hidden');
+      }
+    }
+
+    function loadActiveNoteToEditor() {
+      const note = getActiveNote();
+      if (!note) return;
+
+      noteTitleInput.value = note.title;
+      noteDateText.textContent = formatTime(note.updatedAt);
+      
+      const folder = appState.folders.find(f => f.id === note.folderId);
+      noteFolderBadge.textContent = folder ? folder.name : 'General';
+      noteFolderBadge.style.color = folder ? folder.color : '#64748b';
+
+      richTextContent.innerHTML = note.text || '';
+
+      // PDF state
+      if (note.isPdf) {
+        pdfBackground.classList.remove('hidden');
+      } else {
+        pdfBackground.classList.add('hidden');
+      }
+
+      // Paper template
+      notePaper.className = `w-full max-w-4xl bg-white shadow-md rounded-2xl relative min-h-[850px] transition-all duration-200 flex flex-col overflow-hidden ${note.paperStyle || 'bg-paper-ruled'}`;
+
+      // Star icon
+      const starBtn = document.getElementById('star-note-btn');
+      starBtn.classList.toggle('text-amber-500', !!note.starred);
+      starBtn.classList.toggle('text-slate-400', !note.starred);
+
+      resizeCanvas();
+    }
+
+    function createNewNote() {
+      const newId = 'note-' + Date.now();
+      const newNote = {
+        id: newId,
+        title: 'Untitled Note',
+        folderId: appState.folders[0]?.id || 'folder-work',
+        starred: false,
+        isPdf: false,
+        paperStyle: appState.paperStyle,
+        updatedAt: Date.now(),
+        text: '<div>Start writing or drawing with S-Pen...</div>',
+        strokes: []
+      };
+
+      appState.notes.unshift(newNote);
+      appState.activeNoteId = newId;
+      saveState();
+      renderNotesList();
+      loadActiveNoteToEditor();
+      noteTitleInput.focus();
+      noteTitleInput.select();
+      showToast('Created new note');
+    }
+
+    function deleteActiveNote() {
+      if (appState.notes.length <= 1) {
+        showToast('Cannot delete the last note');
+        return;
+      }
+      appState.notes = appState.notes.filter(n => n.id !== appState.activeNoteId);
+      appState.activeNoteId = appState.notes[0].id;
+      saveState();
+      renderNotesList();
+      loadActiveNoteToEditor();
+      showToast('Note deleted');
+    }
+
+    /* =========================================================================
+       UI RENDERING: NOTES LIST & FOLDERS
+       ========================================================================= */
+    function renderFolders() {
+      foldersList.innerHTML = '';
+      appState.folders.forEach(folder => {
+        const count = appState.notes.filter(n => n.folderId === folder.id).length;
+        const btn = document.createElement('button');
+        btn.className = `w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-200/60 transition ${appState.activeFilter === folder.id ? 'bg-slate-200/80 font-bold text-slate-900' : ''}`;
+        btn.innerHTML = `
+          <span class="flex items-center gap-2 truncate">
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${folder.color}"></span>
+            <span class="truncate">${escapeHtml(folder.name)}</span>
+          </span>
+          <span class="text-slate-400 text-[10px]">${count}</span>
+        `;
+        btn.addEventListener('click', () => {
+          appState.activeFilter = folder.id;
+          document.querySelectorAll('.nav-filter-btn').forEach(b => b.classList.remove('active', 'bg-blue-100/70', 'text-blue-700'));
+          document.getElementById('current-category-title').textContent = folder.name;
+          renderFolders();
+          renderNotesList();
+        });
+        foldersList.appendChild(btn);
+      });
+    }
+
+    function renderNotesList() {
+      notesContainer.innerHTML = '';
+
+      let filtered = appState.notes;
+
+      // Filter by category
+      if (appState.activeFilter === 'starred') {
+        filtered = filtered.filter(n => n.starred);
+      } else if (appState.activeFilter === 'pdf') {
+        filtered = filtered.filter(n => n.isPdf);
+      } else if (appState.activeFilter.startsWith('folder-')) {
+        filtered = filtered.filter(n => n.folderId === appState.activeFilter);
+      }
+
+      // Search query filter
+      if (appState.searchQuery.trim()) {
+        const q = appState.searchQuery.toLowerCase();
+        filtered = filtered.filter(n => 
+          n.title.toLowerCase().includes(q) || 
+          (n.text && n.text.toLowerCase().includes(q))
+        );
+      }
+
+      // Badges count updates
+      document.getElementById('badge-all-count').textContent = appState.notes.length;
+      document.getElementById('badge-starred-count').textContent = appState.notes.filter(n => n.starred).length;
+      document.getElementById('badge-pdf-count').textContent = appState.notes.filter(n => n.isPdf).length;
+      document.getElementById('notes-count-summary').textContent = `${filtered.length} notes \u2022 synced`;
+
+      if (filtered.length === 0) {
+        notesContainer.innerHTML = `
+          <div class="p-8 text-center text-slate-400">
+            <svg class="w-10 h-10 mx-auto mb-2 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <p class="text-xs font-semibold">No notes found</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(note => {
+        const folder = appState.folders.find(f => f.id === note.folderId);
+        const isActive = note.id === appState.activeNoteId;
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-2xl border transition-all cursor-pointer relative group ${
+          isActive 
+            ? 'bg-blue-50/70 border-blue-400 shadow-sm ring-1 ring-blue-400/30' 
+            : 'bg-white hover:bg-slate-50 border-slate-200/80'
+        }`;
+
+        const cleanSnippet = (note.text || '').replace(/<[^>]*>?/gm, ' ').substring(0, 80);
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2 mb-1">
+            <h3 class="font-bold text-xs text-slate-900 truncate leading-snug flex-1">${escapeHtml(note.title || 'Untitled')}</h3>
+            ${note.starred ? '<span class="text-amber-500 text-xs">&#9733;</span>' : ''}
+          </div>
+          
+          <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mb-2">${cleanSnippet || 'Handwritten ink strokes...'}</p>
+          
+          <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+            <span class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full" style="background-color: ${folder ? folder.color : '#94a3b8'}"></span>
+              <span class="font-medium text-slate-600">${folder ? escapeHtml(folder.name) : 'General'}</span>
+            </span>
+            <div class="flex items-center gap-1.5">
+              ${note.isPdf ? '<span class="text-rose-500 font-bold">PDF</span>' : ''}
+              ${note.strokes && note.strokes.length > 0 ? '<span class="text-blue-500 font-bold">INK</span>' : ''}
+              <span>${formatTime(note.updatedAt)}</span>
+            </div>
+          </div>
+        `;
+
+        card.addEventListener('click', () => switchNote(note.id));
+        notesContainer.appendChild(card);
+      });
+    }
+
+    /* =========================================================================
+       EVENT LISTENERS & CONTROLS
+       ========================================================================= */
+
+    // Note Title Input
+    noteTitleInput.addEventListener('input', (e) => {
+      const active = getActiveNote();
+      if (active) {
+        active.title = e.target.value;
+        active.updatedAt = Date.now();
+        saveState();
+        renderNotesList();
+      }
+    });
+
+    // Rich Text Content Edit
+    richTextContent.addEventListener('input', () => {
+      const active = getActiveNote();
+      if (active) {
+        active.text = richTextContent.innerHTML;
+        active.updatedAt = Date.now();
+        saveState();
+      }
+    });
+
+    // Star Toggle
+    document.getElementById('star-note-btn').addEventListener('click', () => {
+      const active = getActiveNote();
+      if (active) {
+        active.starred = !active.starred;
+        active.updatedAt = Date.now();
+        saveState();
+        loadActiveNoteToEditor();
+        renderNotesList();
+        showToast(active.starred ? 'Added to favorites' : 'Removed from favorites');
+      }
+    });
+
+    // Delete Note
+    document.getElementById('delete-note-btn').addEventListener('click', () => {
+      deleteActiveNote();
+    });
+
+    // New Note
+    document.getElementById('new-note-btn').addEventListener('click', () => {
+      createNewNote();
+    });
+
+    // Search input
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      appState.searchQuery = e.target.value;
+      renderNotesList();
+    });
+
+    // Nav Category Filters
+    document.querySelectorAll('.nav-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-filter-btn').forEach(b => b.classList.remove('active', 'bg-blue-100/70', 'text-blue-700'));
+        btn.classList.add('active', 'bg-blue-100/70', 'text-blue-700');
+        appState.activeFilter = btn.dataset.filter;
+        document.getElementById('current-category-title').textContent = btn.innerText.trim().split('\n')[0];
+        renderFolders();
+        renderNotesList();
+      });
+    });
+
+    // Tool switching (Pen, Fountain, Highlighter, Eraser)
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-btn').forEach(b => {
+          b.classList.remove('active', 'bg-blue-100', 'text-blue-700');
+          b.classList.add('hover:bg-slate-100', 'text-slate-600');
+        });
+        btn.classList.add('active', 'bg-blue-100', 'text-blue-700');
+        btn.classList.remove('hover:bg-slate-100', 'text-slate-600');
+        appState.currentTool = btn.dataset.tool;
+
+        // Auto-adjust size default
+        if (appState.currentTool === 'highlighter') {
+          document.getElementById('brush-size').value = 18;
+          appState.currentSize = 18;
+        } else if (appState.currentTool === 'fountain') {
+          document.getElementById('brush-size').value = 4;
+          appState.currentSize = 4;
+        } else {
+          document.getElementById('brush-size').value = 3;
+          appState.currentSize = 3;
+        }
+        document.getElementById('brush-size-display').textContent = appState.currentSize;
+      });
+    });
+
+    // Smart Shape toggle
+    const smartShapeBtn = document.getElementById('smart-shape-btn');
+    smartShapeBtn.addEventListener('click', () => {
+      appState.smartShapeActive = !appState.smartShapeActive;
+      if (appState.smartShapeActive) {
+        smartShapeBtn.classList.add('bg-purple-100', 'text-purple-700', 'ring-1', 'ring-purple-400');
+        showToast('Neat Shapes Enabled: Hold pen to snap geometry');
+      } else {
+        smartShapeBtn.classList.remove('bg-purple-100', 'text-purple-700', 'ring-1', 'ring-purple-400');
+        showToast('Neat Shapes Disabled');
+      }
+    });
+
+    // Color Swatches
+    document.querySelectorAll('.color-swatch').forEach(swatch => {
+      swatch.addEventListener('click', () => {
+        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('ring-2', 'ring-offset-1', 'ring-blue-600'));
+        swatch.classList.add('ring-2', 'ring-offset-1', 'ring-blue-600');
+        appState.currentColor = swatch.dataset.color;
+      });
+    });
+
+    // Custom Color
+    const customPicker = document.getElementById('custom-color-picker');
+    document.getElementById('custom-color-trigger').addEventListener('click', () => {
+      customPicker.click();
+    });
+    customPicker.addEventListener('input', (e) => {
+      appState.currentColor = e.target.value;
+      showToast('Custom color selected');
+    });
+
+    // Brush Size
+    const brushRange = document.getElementById('brush-size');
+    const brushDisplay = document.getElementById('brush-size-display');
+    brushRange.addEventListener('input', (e) => {
+      appState.currentSize = parseInt(e.target.value, 10);
+      brushDisplay.textContent = appState.currentSize;
+    });
+
+    // Undo / Redo
+    document.getElementById('undo-btn').addEventListener('click', () => {
+      const active = getActiveNote();
+      if (!active || active.strokes.length === 0) return;
+      const popped = active.strokes.pop();
+      redoStack.push(popped);
+      saveState();
+      redrawCanvas();
+      showToast('Undo stroke');
+    });
+
+    document.getElementById('redo-btn').addEventListener('click', () => {
+      const active = getActiveNote();
+      if (!active || redoStack.length === 0) return;
+      const stroke = redoStack.pop();
+      active.strokes.push(stroke);
+      saveState();
+      redrawCanvas();
+      showToast('Redo stroke');
+    });
+
+    // Clear Canvas
+    document.getElementById('clear-canvas-btn').addEventListener('click', () => {
+      const active = getActiveNote();
+      if (!active) return;
+      active.strokes = [];
+      saveState();
+      redrawCanvas();
+      showToast('Canvas cleared');
+    });
+
+    // Mode Switcher: Pen vs Text vs Split
+    const modePenBtn = document.getElementById('mode-pen-btn');
+    const modeTextBtn = document.getElementById('mode-text-btn');
+    const modeHybridBtn = document.getElementById('mode-hybrid-btn');
+
+    function setEditorMode(mode) {
+      appState.editorMode = mode;
+      [modePenBtn, modeTextBtn, modeHybridBtn].forEach(b => {
+        b.classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
+        b.classList.add('text-slate-600');
+      });
+
+      if (mode === 'pen') {
+        modePenBtn.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+        textLayer.classList.add('hidden');
+        inkCanvas.style.pointerEvents = 'auto';
+        penToolbar.classList.remove('hidden');
+      } else if (mode === 'text') {
+        modeTextBtn.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+        textLayer.classList.remove('hidden');
+        inkCanvas.style.pointerEvents = 'none';
+        penToolbar.classList.add('hidden');
+      } else if (mode === 'hybrid') {
+        modeHybridBtn.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
+        textLayer.classList.remove('hidden');
+        inkCanvas.style.pointerEvents = 'auto';
+        penToolbar.classList.remove('hidden');
+      }
+      resizeCanvas();
+    }
+
+    modePenBtn.addEventListener('click', () => setEditorMode('pen'));
+    modeTextBtn.addEventListener('click', () => setEditorMode('text'));
+    modeHybridBtn.addEventListener('click', () => setEditorMode('hybrid'));
+
+    // Audio memo simulation
+    let audioTimer = null;
+    const audioBar = document.getElementById('audio-bar');
+    const voiceRecordBtn = document.getElementById('voice-record-btn');
+    const stopRecordingBtn = document.getElementById('stop-recording-btn');
+    const recordingTimeDisplay = document.getElementById('recording-time');
+
+    voiceRecordBtn.addEventListener('click', () => {
+      if (appState.isRecording) return;
+      appState.isRecording = true;
+      appState.recordingSeconds = 0;
+      audioBar.classList.remove('hidden');
+      showToast('Recording audio memo synchronized to note');
+
+      audioTimer = setInterval(() => {
+        appState.recordingSeconds++;
+        const mins = String(Math.floor(appState.recordingSeconds / 60)).padStart(2, '0');
+        const secs = String(appState.recordingSeconds % 60).padStart(2, '0');
+        recordingTimeDisplay.textContent = `${mins}:${secs}`;
+      }, 1000);
+    });
+
+    stopRecordingBtn.addEventListener('click', () => {
+      appState.isRecording = false;
+      clearInterval(audioTimer);
+      audioBar.classList.add('hidden');
+      showToast('Audio recording saved with S-Pen sync bookmarks');
+    });
+
+    document.getElementById('add-bookmark-btn').addEventListener('click', () => {
+      showToast(`Bookmark added at ${recordingTimeDisplay.textContent}`);
+    });
+
+    // Paper Templates modal
+    const templateModal = document.getElementById('template-modal');
+    document.getElementById('template-btn').addEventListener('click', () => {
+      templateModal.classList.remove('hidden');
+    });
+    document.getElementById('close-template-modal').addEventListener('click', () => {
+      templateModal.classList.add('hidden');
+    });
+    document.querySelectorAll('.template-choice-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const style = btn.dataset.template;
+        const active = getActiveNote();
+        if (active) {
+          active.paperStyle = style;
+          saveState();
+          loadActiveNoteToEditor();
+          templateModal.classList.add('hidden');
+          showToast('Paper style updated');
+        }
+      });
+    });
+
+    // Cloud Sync Modal
+    const syncModal = document.getElementById('sync-modal');
+    document.getElementById('sync-modal-btn').addEventListener('click', () => {
+      updateDiagnostics();
+      syncModal.classList.remove('hidden');
+    });
+    document.getElementById('close-sync-modal').addEventListener('click', () => {
+      syncModal.classList.add('hidden');
+    });
+
+    document.getElementById('trigger-sync-btn').addEventListener('click', () => {
+      const spinner = document.getElementById('sync-spinner');
+      spinner.classList.remove('hidden');
+      setTimeout(() => {
+        spinner.classList.add('hidden');
+        showToast('All notes synced with Galaxy Z Fold 8 and Chromebook');
+      }, 700);
+    });
+
+    document.getElementById('simulate-remote-edit-btn').addEventListener('click', () => {
+      const active = getActiveNote();
+      if (!active) return;
+
+      // Inbound stroke from S-Pen
+      const randomY = 200 + Math.random() * 200;
+      active.strokes.push({
+        tool: 'fountain',
+        color: '#059669',
+        size: 4,
+        points: [
+          { x: 100, y: randomY, p: 0.7 },
+          { x: 250, y: randomY + 10, p: 0.8 },
+          { x: 400, y: randomY - 10, p: 0.6 }
+        ]
+      });
+      active.updatedAt = Date.now();
+      saveState();
+      redrawCanvas();
+      renderNotesList();
+      syncModal.classList.add('hidden');
+      showToast('Remote S-Pen stroke merged from Galaxy Z Fold 8');
+    });
+
+    // Device Viewport Simulation (For testing responsiveness & fold postures)
+    const modeAuto = document.getElementById('mode-auto');
+    const modeFoldCover = document.getElementById('mode-fold-cover');
+    const modeFoldOpen = document.getElementById('mode-fold-open');
+    const modeChromebook = document.getElementById('mode-chromebook');
+    const modeFlex = document.getElementById('mode-flex');
+    const flexPanel = document.getElementById('flex-mode-panel');
+
+    function resetDeviceButtons() {
+      [modeAuto, modeFoldCover, modeFoldOpen, modeChromebook, modeFlex].forEach(b => {
+        b.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+        b.classList.add('text-slate-600');
+      });
+      flexPanel.classList.add('hidden');
+      deviceWrapper.style.maxWidth = '100%';
+      deviceWrapper.style.padding = '0';
+      sidebar.classList.remove('hidden');
+      document.getElementById('notes-list-pane').classList.remove('hidden');
+    }
+
+    modeAuto.addEventListener('click', () => {
+      resetDeviceButtons();
+      modeAuto.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+      resizeCanvas();
+    });
+
+    modeFoldCover.addEventListener('click', () => {
+      resetDeviceButtons();
+      modeFoldCover.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+      deviceWrapper.style.maxWidth = '412px';
+      deviceWrapper.style.padding = '12px';
+      sidebar.classList.add('hidden');
+      resizeCanvas();
+      showToast('Simulating Galaxy Z Fold Cover Screen (Narrow)');
+    });
+
+    modeFoldOpen.addEventListener('click', () => {
+      resetDeviceButtons();
+      modeFoldOpen.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+      deviceWrapper.style.maxWidth = '780px';
+      deviceWrapper.style.padding = '12px';
+      resizeCanvas();
+      showToast('Simulating Galaxy Z Fold 8 Unfolded 8.0" Tablet Screen');
+    });
+
+    modeChromebook.addEventListener('click', () => {
+      resetDeviceButtons();
+      modeChromebook.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+      deviceWrapper.style.maxWidth = '1280px';
+      deviceWrapper.style.padding = '8px';
+      resizeCanvas();
+      showToast('Simulating Googlebook Chromebook Widescreen');
+    });
+
+    modeFlex.addEventListener('click', () => {
+      resetDeviceButtons();
+      modeFlex.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+      deviceWrapper.style.maxWidth = '680px';
+      sidebar.classList.add('hidden');
+      flexPanel.classList.remove('hidden');
+      resizeCanvas();
+      showToast('Simulating Galaxy Z Fold Flex Mode Tabletop');
+    });
+
+    // Mobile back button
+    document.getElementById('mobile-back-btn').addEventListener('click', () => {
+      document.getElementById('notes-list-pane').classList.remove('hidden');
+      document.getElementById('editor-pane').classList.add('hidden');
+    });
+
+    // Sidebar toggle
+    toggleSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('hidden');
+      resizeCanvas();
+    });
+
+    // New Folder Modal
+    const folderModal = document.getElementById('folder-modal');
+    document.getElementById('add-folder-btn').addEventListener('click', () => {
+      folderModal.classList.remove('hidden');
+    });
+    document.getElementById('cancel-folder-btn').addEventListener('click', () => {
+      folderModal.classList.add('hidden');
+    });
+
+    let selectedFolderColor = '#0c66e4';
+    document.querySelectorAll('#folder-color-choices button').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#folder-color-choices button').forEach(x => x.classList.remove('ring-2', 'ring-offset-1', 'ring-blue-600'));
+        b.classList.add('ring-2', 'ring-offset-1', 'ring-blue-600');
+        selectedFolderColor = b.dataset.color;
+      });
+    });
+
+    document.getElementById('save-folder-btn').addEventListener('click', () => {
+      const nameInput = document.getElementById('new-folder-name');
+      const name = nameInput.value.trim();
+      if (!name) return;
+      const newFolder = {
+        id: 'folder-' + Date.now(),
+        name: name,
+        color: selectedFolderColor
+      };
+      appState.folders.push(newFolder);
+      nameInput.value = '';
+      folderModal.classList.add('hidden');
+      saveState();
+      renderFolders();
+      showToast('Folder created');
+    });
+
+    // Backup & Data Portability
+    const backupModal = document.getElementById('backup-modal');
+    document.getElementById('backup-btn').addEventListener('click', () => {
+      backupModal.classList.remove('hidden');
+    });
+    document.getElementById('close-backup-modal').addEventListener('click', () => {
+      backupModal.classList.add('hidden');
+    });
+
+    document.getElementById('export-json-btn').addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+        notes: appState.notes,
+        folders: appState.folders
+      }, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `fold_sync_notes_backup_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('Notes backup exported');
+    });
+
+    const importFileInput = document.getElementById('import-file-input');
+    document.getElementById('import-trigger-btn').addEventListener('click', () => {
+      importFileInput.click();
+    });
+    importFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (parsed.notes && Array.isArray(parsed.notes)) {
+            appState.notes = parsed.notes;
+            if (parsed.folders) appState.folders = parsed.folders;
+            appState.activeNoteId = appState.notes[0]?.id || 'note-1';
+            saveState();
+            renderFolders();
+            renderNotesList();
+            loadActiveNoteToEditor();
+            backupModal.classList.add('hidden');
+            showToast('Notes backup successfully restored');
+          }
+        } catch (err) {
+          showToast('Failed to parse JSON file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('restore-demo-btn').addEventListener('click', () => {
+      appState.notes = JSON.parse(JSON.stringify(defaultNotes));
+      appState.folders = JSON.parse(JSON.stringify(defaultFolders));
+      appState.activeNoteId = 'note-1';
+      saveState();
+      renderFolders();
+      renderNotesList();
+      loadActiveNoteToEditor();
+      backupModal.classList.add('hidden');
+      showToast('Restored default demo notes & sketches');
+    });
+
+    // Helper functions
+    function formatTime(timestamp) {
+      if (!timestamp) return 'Recent';
+      const d = new Date(timestamp);
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+
+    function showToast(msg) {
+      toastMessage.textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+
+    function updateDiagnostics() {
+      try {
+        const raw = JSON.stringify(appState.notes);
+        const bytes = new Blob([raw]).size;
+        const kb = (bytes / 1024).toFixed(1);
+        const storageEl = document.getElementById('storage-used-display');
+        if (storageEl) storageEl.textContent = `${kb} KB`;
+        const clockEl = document.getElementById('clock-display');
+        if (clockEl) clockEl.textContent = `v${appState.notes.length * 42}_state`;
+      } catch (e) {}
+    }
+
+    // Keyboard Shortcuts (Chromebook Productivity)
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        document.getElementById('undo-btn').click();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        document.getElementById('redo-btn').click();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        createNewNote();
+      }
+    });
+
+    /* =========================================================================
+       INITIAL LAUNCH
+       ========================================================================= */
+    window.addEventListener('load', () => {
+      renderFolders();
+      renderNotesList();
+      loadActiveNoteToEditor();
+      resizeCanvas();
+    });
+  </script>
+</body>
+</html>
